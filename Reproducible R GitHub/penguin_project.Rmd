@@ -1,0 +1,172 @@
+---
+---
+---
+
+# Penguin Project
+
+## Introduction
+
+This script aims to run and produce an analysis pipeline on the Palmer Penguins dataset using R. It will explore influence of both sex and species on the body mass of the Adelie, Chinstrap and Gentoo penguins included in this dataset. Analyzing how these factors influence penguin body mass can increase understanding of biology and ecology, and may also have implications for penguin conservation and management.
+
+#### Set Up
+
+Before carrying out this analysis, the correct packages and functions must be available for use. The chunk of R code below contains the necessary packages for this analysis, as well as code that allows the custom functions used to be called.
+
+```{r Setup}
+
+#Code to install packages if not already installed.
+#install.packages(c("ggplot2", "palmerpenguins", "janitor", "dplyr", "ragg", "svglite", "plotrix"))
+
+#Libraries used within this analysis, these can also be found in "functions/libraries.r". Unhash the code below to load libraries. 
+library(ggplot2)
+library(palmerpenguins)  # this contains the dataset for this analysis
+library(dplyr)
+library(janitor)
+library(ragg)
+library(svglite)
+library(plotrix)
+
+
+#This code allows functions used within this analysis to be called within this R script 
+source("functions/cleaning.r")
+source("functions/plotting.r")
+
+
+```
+
+### Data Exploration and Cleaning
+
+Initial exploration of the data shows that the column headings are not human or computer friendly and there are some empty rows/columns. It must cleaned to ensure it can be easily analysed, this cleaned data must also be saved for future reference and analysis.
+
+The R chunk below saves the raw data, cleans the data and saves it afterwards.
+
+```{r Loading and Cleaning Data}
+
+#This code saves the raw data as a *.csv file within the 'data' file in the R project.
+write.csv(penguins_raw, "data/penguins_raw.csv")
+
+
+#Check the raw data to see if it needs cleaning.
+names(penguins_raw)
+
+#Code to make headings readable and to remove empty columns/rows. 
+#The functions used in this code is called from "functions/cleaning.r".
+penguins_clean <- penguins_raw %>%
+    clean_column_names() %>%
+    shorten_species() %>%
+    remove_empty_columns_rows()
+
+#Check that the data has been cleaned by using below code.
+names(penguins_clean)
+
+
+#Save this now cleaned data as a *.csv file within the 'data' file in the R project.
+write.csv(penguins_clean, "data/penguins_clean.csv")
+
+```
+
+Once data is cleaned, its structure and potential trends can be explored . The code below produces and saves the exploratory graph that influenced this analysis. As some data points within this analysis contains NAs, these are removed first before the figure is produced.
+
+```{r Data Exploration}
+
+#This code creates a data set containing only the following columns: "body_mass_g", "species", "sex". Any rows containing NAs are removed. Functions called from "functions/cleaning.r".
+body_mass_data <- penguins_clean %>%
+  subset_columns(c("body_mass_g", "species", "sex")) %>%
+  remove_NA()
+
+#Save this data set 
+write.csv(body_mass_data, "data/body_mass_data.csv")
+
+
+#Creates a violin plot of body mass distribution across species, with individual points coloured by sex. Function called from "functions/plotting.r".
+body_mass_plot <- plot_body_mass(body_mass_data)
+
+#Print figure 
+body_mass_plot
+
+
+#Save figure as *.png. Function found in "functions/plotting.r"
+save_figure_png(body_mass_plot, "figures/exploratory_plot.png", width = 20, 
+                height = 15, res = 600, scaling = 1.2)
+
+
+```
+
+This exploratory figure showing body mass distribution by penguin species and sex, suggests body mass may be influenced by both of these factors: body mass appears to be divided by sex and appears to differ between species. This analysis aims to investigate the significance of their effects.
+
+## Hypothesis
+
+From the observations above the null hypothesis and alternative hypothesis of this analysis are as follows.
+
+**Null Hypothesis** : There is no significant differences in the mean body mass between male and female penguins or across species.
+
+**Alternative Hypothesis :** There is a significant difference in the mean body mass between male and female penguins and also across species.
+
+## Statistical Methods
+
+To investigate the influence of sex and species on penguin body mass, an ANOVA (Analysis of Variance) can be used as the data appears normally . An ANOVA allows for simultaneous analysis of how categorical independent variables (e.g. sex and species) effects the variation of observed in a continuous dependent variable (e.g. body mass).
+
+Below is an R code that carries out this ANOVA.
+
+```{r Statistics}
+
+#Create a linear model where body mass is modeled as a function of sex and species and saves it as "anova_model"
+anova_model <- lm(body_mass_g ~ species + sex, data = body_mass_data)
+
+#summarise this linear model
+summary(anova_model)
+
+#This code runs the ANOVA and saves it as "anova_result"
+anova_result <- anova(anova_model)
+
+#Summarises the ANOVA above.
+print(anova_result)
+
+```
+
+## Results & Discussion
+
+The linear model above gave a comparison of mean body mass between the species and sexes. Compared to mean body mass of Adelie (3372.39 g), Chinstrap penguins 26.92 g heavier (3399.31 g) - although the standard error for this mean is overlaps here (seen in figure below) and the linear model produces a non-statisically significant p-value (p = 0.563) . Gentoo penguins showed a much greater difference in body mass, 1377.86 g greater than Adelie (4750.25 g) with statistical significance being found (p \< 2e-16). This analysis also showed that males have a body mass 667.56 g greater than that of females, also shown to be statistical significant (p \<2 e-16).
+
+These differences can be clearly seen by the below figure, where the mean body mass for each sex and each species with standard error bars are shown along with and statistical significant differences identified.
+
+The ANOVA result shows that both species and sex have a significant impact on the variaiton in body mass as their p-values are highly significant (both p \< 2e-16). Species explains the majority of the variation observed as this factor has the highest sum of squares. Sex explains almost four times less amount of variation but this is still greater than the unexplained variation (residuals). Furthermore, the linear model produced an R\^2 value of 84.68%, indicating this as the proportion of variance in body mass that can be explained by species and sex, which is a high value for biological experiments. From these results it can be concluded that there is a significant difference between the body mass of sexes and species and that these factors can explain a great proportion of the variaion oberserved in body mass in this data.
+
+```{r Plotting Results}
+
+#This code calculates the mean body mass for each sex and each species. Function called from "functions/plotting.r".
+sex_means <- find_means(body_mass_data, "sex")
+species_means <- find_means(body_mass_data, "species")
+
+#Combine the two sets of means calculated above into a single data set. Function called from "functions/plotting.r".
+means_data <- combine_data(species_means, sex_means)
+
+#Save this data set 
+write.csv(means_data, "data/means_data.csv")
+
+
+
+#This code produces a bar plot visualising means of body masses of different species and sexes and the significance found between them. Function called from "functions/plotting.r".
+body_mass_results_plot <-  plot_mean_body_mass(means_data)
+
+#Print figure above
+body_mass_results_plot
+
+
+#Save figure as *.png. Function found in "functions/plotting.r"
+save_figure_png(body_mass_results_plot, "figures/body_mass_results_plot.png", width = 20, 
+                height = 15, res = 600, scaling = 1.15)
+
+
+
+```
+
+The observed difference in body mass between species and sexes aligns with and reaffirms current knowledge. For example, Gentoo penguins exhibited the greatest body mass and are known to be larger than Adelie and Chinstrap penguins. Furthermore, the differences in body mass between sexes reflects the sexual dimorphism known to be seen in penguin species.
+
+The findings of this analysis (although already known) can have wider implications. For example, body mass can play a role in thermoregulation and energy storage, which are needed to survive in Antarctica where these penguins are found. By understanding how variation in body mass is caused by species and sex, it can help us untangle the effects of other factors which may be less predictable. This may aid in conservation efforts in upcoming years as the penguins polar habitat is now constantly under threat of warming.
+
+However, other factors were not taken into consideration during this analysis and so may have influenced the results. Further study which takes multiple factors into account (such as location, age, feeding etc) may be able to unpick their effects from each other.
+
+## Conclusion
+
+This analysis concludes that there is a significant difference between the body mass of sexes and species and that there the significant effect of these factors on penguin body mass. These conclusions were drawn from Palmer Penguin data set and an linear model and ANOVA applied to this. These findings may contribute to the understanding of these species and could aid in future research in body mass variation and species conservation.
